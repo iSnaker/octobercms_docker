@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$/../../kotpoel/backend" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../kotpoel/frontend" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../kotpoel/october_files" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../kurare/plugins/xakfull" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../kurare/plugins/xakfull/tools" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../kurare/theme" vcs="Git" />
+  </component>
+</project>
