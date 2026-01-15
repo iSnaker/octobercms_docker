@@ -57,7 +57,8 @@ RUN  git status && git checkout modules/. && \
   mv /usr/src/octobercms-config-docker config/docker
 
 # Set proper permissions
-RUN chown -R www-data:www-data /var/www/html && \
+RUN mkdir -p /var/www/html/storage/logs && \
+  chown -R www-data:www-data /var/www/html && \
   chmod -R 775 /var/www/html/storage /var/www/html/plugins /var/www/html/themes && \
   find . -type d \( -path './plugins' -or -path './storage' -or -path './themes' -or -path './plugins/*' -or -path './storage/*' -or -path './themes/*' \) -exec chmod g+ws {} \;
 

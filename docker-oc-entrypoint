@@ -3,6 +3,16 @@ set -e
 
 echo 'Initializing container'
 
+# Fix permissions for October CMS directories
+echo 'Setting proper permissions for storage, plugins, and themes directories...'
+chown -R www-data:www-data /var/www/html/storage /var/www/html/plugins /var/www/html/themes 2>/dev/null || true
+chmod -R 775 /var/www/html/storage /var/www/html/plugins /var/www/html/themes 2>/dev/null || true
+
+# Ensure logs directory exists and is writable
+mkdir -p /var/www/html/storage/logs
+chmod -R 775 /var/www/html/storage/logs
+chown -R www-data:www-data /var/www/html/storage/logs
+
 # PHP config
 if [ ! -z "$PHP_DISPLAY_ERRORS" ]; then
   echo "php.ini set display_errors=$PHP_DISPLAY_ERRORS"
@@ -144,22 +154,21 @@ apply_october_patch() {
      echo "[entrypoint] Patch applied successfully"
    }
 
- # Run october up on container start - check if first run
- if [ ! -f "/var/www/html/storage/.october_installed" ]; then
-   echo 'Initializing October CMS (first run detected)...'
-
-   # ---- logic ----
 
    APP_ENV_VALUE="${APP_ENV:-production}"
 
-   echo "[entrypoint] APP_ENV=$APP_ENV_VALUE"
+      echo "[entrypoint] APP_ENV=$APP_ENV_VALUE"
 
-   if [ "$APP_ENV_VALUE" != "production" ]; then
-     echo "[entrypoint] Non-production environment detected, applying patch..."
-     apply_october_patch
-   else
-     echo "[entrypoint] Production environment detected, patch NOT applied"
-   fi
+      if [ "$APP_ENV_VALUE" != "production" ]; then
+        echo "[entrypoint] Non-production environment detected, applying patch..."
+        apply_october_patch
+      else
+        echo "[entrypoint] Production environment detected, patch NOT applied"
+      fi
+
+ # Run october up on container start - check if first run
+ if [ ! -f "/var/www/html/storage/.october_installed" ]; then
+   echo 'Initializing October CMS (first run detected)...'
 
    # Install October CMS
    echo "Running october:install..."
@@ -171,19 +180,36 @@ apply_october_patch() {
         php artisan key:generate
   fi
 
-  # Run migrations to create database tables
-     echo "Running database migrations..."
+  # Run migrations to create system database tables FIRST
+     echo "Running initial database migrations to create system tables..."
      php artisan october:up
 
-  # Install essential plugins
-     echo "Installing essential plugins..."
-     php artisan plugin:install october.drivers || echo "Warning: Failed to install october.drivers"
-     php artisan plugin:install rainlab.builder || echo "Warning: Failed to install rainlab.builder"
-     php artisan plugin:install rainlab.user || echo "Warning: Failed to install rainlab.user"
+  # Install plugins from OCTOBER_PLUGINS environment variable AFTER system tables are created
+  # This ensures dependencies are installed before custom mounted plugins are initialized
+     if [ ! -z "$OCTOBER_PLUGINS" ]; then
+       echo "Installing plugins from OCTOBER_PLUGINS: $OCTOBER_PLUGINS"
+
+       # Split plugins by comma and install each one
+       IFS=',' read -ra PLUGINS <<< "$OCTOBER_PLUGINS"
+       for plugin in "${PLUGINS[@]}"; do
+         # Trim whitespace
+         plugin=$(echo "$plugin" | xargs)
+
+         if [ ! -z "$plugin" ]; then
+           echo "Installing plugin: $plugin"
+           php artisan plugin:install "$plugin" || echo "Warning: Failed to install $plugin"
+         fi
+       done
+     else
+       echo "No plugins specified in OCTOBER_PLUGINS, skipping plugin installation"
+     fi
 
   # set default admin user credentials
      echo "Setting default admin/admin user credentials..."
      php artisan october:passwd admin admin
+
+     echo "Removing demo plugin and theme"
+     php artisan october:fresh
 
   # Mark as installed
      touch /var/www/html/storage/.october_installed
