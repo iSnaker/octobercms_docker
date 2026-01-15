@@ -55,49 +55,80 @@ docker run -d \
 Создайте файл `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
-
 services:
   october:
-    build: .
+    image: snapix/october:latest
     ports:
-      - "8080:80"
+      - 8888:80
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - config:/var/www/html/config
+      - plugins:/var/www/html/plugins
+      - storage:/var/www/html/storage
+      # Опционально: монтируйте свои кастомные темы и плагины
+      # - ./themes/<your-custom-theme>:/var/www/html/themes/<your-custom-theme>
+      # - ./plugins/<your-custom-plugin>:/var/www/html/plugins/<your-custom-plugin>
     environment:
       - DB_TYPE=mysql
       - DB_HOST=mysql
-      - DB_DATABASE=october
-      - DB_USERNAME=october
-      - DB_PASSWORD=secret
-      - PHP_MEMORY_LIMIT=256M
-      - PHP_UPLOAD_MAX_FILESIZE=64M
-      - PHP_POST_MAX_SIZE=64M
-    volumes:
-      - ./storage:/var/www/html/storage
-      - ./plugins:/var/www/html/plugins
-      - ./themes:/var/www/html/themes
-    depends_on:
-      - mysql
+      - DB_DATABASE=octobercms
+      - DB_USERNAME=root
+      - DB_PASSWORD=root
+      - APP_URL=http://localhost:8888
+      - APP_ENV=docker
+      - TZ=UTC
+      # Список плагинов для автоматической установки (через запятую)
+      - OCTOBER_PLUGINS=rainlab.builder,rainlab.user,rainlab.blog,rainlab.pages
 
   mysql:
-    image: mysql:8.0
-    environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=october
-      - MYSQL_USER=october
-      - MYSQL_PASSWORD=secret
+    image: mysql:5.7
+    platform: linux/amd64
+    ports:
+      - 3306:3306
     volumes:
       - mysql-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=octobercms
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin
+    restart: always
+    depends_on:
+      - mysql
     ports:
-      - "3306:3306"
+      - 8080:80
+    environment:
+      - PMA_HOST=mysql
+      - PMA_USER=root
+      - PMA_PASSWORD=root
+      - UPLOAD_LIMIT=300M
+      - MAX_EXECUTION_TIME=600
+      - MEMORY_LIMIT=512M
 
 volumes:
   mysql-data:
+  config:
+  plugins:
+  storage:
 ```
 
 Запустите:
 ```bash
 docker-compose up -d
 ```
+
+Доступ к сервисам:
+- **October CMS**: http://localhost:8888
+- **phpMyAdmin**: http://localhost:8080
+- **MySQL**: localhost:3306
 
 ## ⚙️ Переменные окружения
 
@@ -112,6 +143,15 @@ docker-compose up -d
 | `DB_USERNAME` | Имя пользователя БД | - |
 | `DB_PASSWORD` | Пароль БД | - |
 | `DB_PATH_SQLITE` | Путь к SQLite файлу | `storage/database.sqlite` |
+
+### Настройки October CMS
+
+| Переменная | Описание | Значение по умолчанию |
+|-----------|----------|----------------------|
+| `OCTOBER_PLUGINS` | Список плагинов для автоматической установки (через запятую) | - |
+| `APP_URL` | URL приложения | `http://localhost` |
+| `APP_ENV` | Окружение (local, production, docker) | `production` |
+| `TZ` | Часовой пояс | `UTC` |
 
 ### Настройки PHP
 
