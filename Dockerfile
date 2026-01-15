@@ -1,7 +1,9 @@
 # October CMS 1.1.12 Dockerfile
 FROM php:7.4-apache
 
-RUN apt-get update && apt-get install -y cron git-core nodejs jq unzip vim zip \
+# Install Node.js 20.x
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+  apt-get update && apt-get install -y cron git-core nodejs jq unzip vim zip \
   libjpeg-dev libpng-dev libpq-dev libsqlite3-dev libwebp-dev libzip-dev && \
   rm -rf /var/lib/apt/lists/* && \
   docker-php-ext-configure zip --with-zip && \
