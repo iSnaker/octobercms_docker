@@ -4,13 +4,14 @@ Docker-образ для October CMS 1.1.12 на базе PHP 7.4 и Apache.
 
 ## 📋 Описание
 
-Этот проект предоставляет готовый Docker-образ для быстрого развертывания October CMS версии 1.1.12. Образ включает все необходимые зависимости, настроенный PHP, Apache и вспомогательные инструменты для работы с October CMS.
+Этот проект предоставляет готовый Docker-образ для быстрого развертывания October CMS версии 1.1.12. Образ включает все
+необходимые зависимости, настроенный PHP, Apache и вспомогательные инструменты для работы с October CMS.
 
 ## 🚀 Возможности
 
 - **October CMS 1.1.12** - полная установка CMS
 - **PHP 7.4** с предустановленными расширениями:
-  - `exif`, `gd`, `mysqli`, `opcache`, `pdo_pgsql`, `pdo_mysql`, `zip`
+    - `exif`, `gd`, `mysqli`, `opcache`, `pdo_pgsql`, `pdo_mysql`, `zip`
 - **Apache** с включенным `mod_rewrite`
 - **Node.js 20.x** с npm для работы с frontend-инструментами
 - **Composer** для управления зависимостями
@@ -28,17 +29,20 @@ Docker-образ для October CMS 1.1.12 на базе PHP 7.4 и Apache.
 ### Базовая установка
 
 1. Клонируйте репозиторий:
+
 ```bash
 git clone <repository-url>
 cd snapix-dockered/october
 ```
 
 2. Соберите Docker-образ:
+
 ```bash
 docker build -t october-cms:1.1.12 .
 ```
 
 3. Запустите контейнер:
+
 ```bash
 docker run -d \
   --name october-cms \
@@ -71,35 +75,50 @@ docker exec october-cms composer --version
 
 ### Использование с Docker Compose
 
-Создайте файл `docker-compose.yml`:
+Пример файла `docker-compose.yml` с поддержкой виртуальных хостов, MySQL и phpMyAdmin:
 
 ```yaml
+#docker-compose.yml
 services:
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - october-network
+
   october:
     image: snapix/october:latest
+    expose:
+      - 80
     ports:
       - 8888:80
+      - 4001:3000  # для BrowserSync - опционально
     depends_on:
       mysql:
         condition: service_healthy
     volumes:
       - config:/var/www/html/config
       - plugins:/var/www/html/plugins
-      - storage:/var/www/html/storage
-      # Опционально: монтируйте свои кастомные темы и плагины
-      # - ./themes/<your-custom-theme>:/var/www/html/themes/<your-custom-theme>
-      # - ./plugins/<your-custom-plugin>:/var/www/html/plugins/<your-custom-plugin>
+      - ./theme:/var/www/html/themes/theme # пример пользовательской темы
+      - ./plugin:/var/www/html/plugins/yourplugin # пример пользовательского плагина
+      - ./storage:/var/www/html/storage
     environment:
       - DB_TYPE=mysql
       - DB_HOST=mysql
       - DB_DATABASE=octobercms
       - DB_USERNAME=root
       - DB_PASSWORD=root
-      - APP_URL=http://localhost:8888
       - APP_ENV=docker
       - TZ=UTC
-      # Список плагинов для автоматической установки (через запятую)
-      - OCTOBER_PLUGINS=rainlab.builder,rainlab.user,rainlab.blog,rainlab.pages
+      - # плагины для автоматической установки при старте контейнера, через запятую
+      - OCTOBER_PLUGINS=rainlab.builder,rainlab.user,blakejones.magicforms,rainlab.blog,rainlab.pages,ToughDeveloper.ImageResizer,Zen.Robots,offline.sitesearch,RainLab.Translate
+      # Опционально: Виртуальные хосты для nginx-proxy. Можно указать несколько через запятую.
+      - VIRTUAL_HOST=site1.local,site2.local
+    networks:
+      - october-network
 
   mysql:
     image: mysql:5.7
@@ -112,10 +131,12 @@ services:
       - MYSQL_ROOT_PASSWORD=root
       - MYSQL_DATABASE=octobercms
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-proot" ]
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - october-network
 
   phpmyadmin:
     image: phpmyadmin
@@ -131,20 +152,27 @@ services:
       - UPLOAD_LIMIT=300M
       - MAX_EXECUTION_TIME=600
       - MEMORY_LIMIT=512M
+    networks:
+      - october-network
 
 volumes:
   mysql-data:
   config:
   plugins:
-  storage:
+
+networks:
+  october-network:
+    driver: bridge
 ```
 
 Запустите:
+
 ```bash
 docker-compose up -d
 ```
 
 Доступ к сервисам:
+
 - **October CMS**: http://localhost:8888
 - **phpMyAdmin**: http://localhost:8080
 - **MySQL**: localhost:3306
@@ -153,40 +181,40 @@ docker-compose up -d
 
 ### Настройки базы данных
 
-| Переменная | Описание | Значение по умолчанию |
-|-----------|----------|----------------------|
-| `DB_TYPE` | Тип базы данных (sqlite, mysql, pgsql) | `sqlite` |
-| `DB_HOST` | Хост базы данных | `mysql` |
-| `DB_PORT` | Порт базы данных | - |
-| `DB_DATABASE` | Имя базы данных | - |
-| `DB_USERNAME` | Имя пользователя БД | - |
-| `DB_PASSWORD` | Пароль БД | - |
-| `DB_PATH_SQLITE` | Путь к SQLite файлу | `storage/database.sqlite` |
+| Переменная       | Описание                               | Значение по умолчанию     |
+|------------------|----------------------------------------|---------------------------|
+| `DB_TYPE`        | Тип базы данных (sqlite, mysql, pgsql) | `sqlite`                  |
+| `DB_HOST`        | Хост базы данных                       | `mysql`                   |
+| `DB_PORT`        | Порт базы данных                       | -                         |
+| `DB_DATABASE`    | Имя базы данных                        | -                         |
+| `DB_USERNAME`    | Имя пользователя БД                    | -                         |
+| `DB_PASSWORD`    | Пароль БД                              | -                         |
+| `DB_PATH_SQLITE` | Путь к SQLite файлу                    | `storage/database.sqlite` |
 
 ### Настройки October CMS
 
-| Переменная | Описание | Значение по умолчанию |
-|-----------|----------|----------------------|
-| `OCTOBER_PLUGINS` | Список плагинов для автоматической установки (через запятую) | - |
-| `APP_URL` | URL приложения | `http://localhost` |
-| `APP_ENV` | Окружение (local, production, docker) | `production` |
-| `TZ` | Часовой пояс | `UTC` |
+| Переменная        | Описание                                                     | Значение по умолчанию |
+|-------------------|--------------------------------------------------------------|-----------------------|
+| `OCTOBER_PLUGINS` | Список плагинов для автоматической установки (через запятую) | -                     |
+| `APP_URL`         | URL приложения                                               | `http://localhost`    |
+| `APP_ENV`         | Окружение (local, production, docker)                        | `production`          |
+| `TZ`              | Часовой пояс                                                 | `UTC`                 |
 
 ### Настройки PHP
 
-| Переменная | Описание | Значение по умолчанию |
-|-----------|----------|----------------------|
-| `PHP_DISPLAY_ERRORS` | Отображение ошибок PHP | `off` |
-| `PHP_MEMORY_LIMIT` | Лимит памяти PHP | `128M` |
-| `PHP_UPLOAD_MAX_FILESIZE` | Максимальный размер загружаемого файла | `32M` |
-| `PHP_POST_MAX_SIZE` | Максимальный размер POST запроса | `32M` |
+| Переменная                | Описание                               | Значение по умолчанию |
+|---------------------------|----------------------------------------|-----------------------|
+| `PHP_DISPLAY_ERRORS`      | Отображение ошибок PHP                 | `off`                 |
+| `PHP_MEMORY_LIMIT`        | Лимит памяти PHP                       | `128M`                |
+| `PHP_UPLOAD_MAX_FILESIZE` | Максимальный размер загружаемого файла | `32M`                 |
+| `PHP_POST_MAX_SIZE`       | Максимальный размер POST запроса       | `32M`                 |
 
 ### Настройки Xdebug (для разработки)
 
-| Переменная | Описание |
-|-----------|----------|
-| `XDEBUG_ENABLE` | Включить Xdebug (true/false) |
-| `XDEBUG_REMOTE_HOST` | Хост для удаленной отладки |
+| Переменная           | Описание                     |
+|----------------------|------------------------------|
+| `XDEBUG_ENABLE`      | Включить Xdebug (true/false) |
+| `XDEBUG_REMOTE_HOST` | Хост для удаленной отладки   |
 
 ## 🔧 Вспомогательные команды
 
@@ -227,6 +255,7 @@ docker exec -it october-cms october migrate   # Выполнение мигра�
 ## 🔐 Права доступа
 
 Docker-образ автоматически настраивает права доступа для следующих директорий:
+
 - `/var/www/html/storage` - 775
 - `/var/www/html/plugins` - 775
 - `/var/www/html/themes` - 775
@@ -238,17 +267,20 @@ Docker-образ автоматически настраивает права �
 Образ включает Node.js версии 20.x и npm для работы с frontend-инструментами.
 
 Проверка версий:
+
 ```bash
 docker exec -it october-cms node --version
 docker exec -it october-cms npm --version
 ```
 
 Установка зависимостей:
+
 ```bash
 docker exec -it october-cms npm install
 ```
 
 Запуск скриптов:
+
 ```bash
 docker exec -it october-cms npm run build
 ```
@@ -256,6 +288,7 @@ docker exec -it october-cms npm run build
 ## 🕐 Cron задачи
 
 Контейнер автоматически запускает планировщик задач October CMS каждую минуту:
+
 ```bash
 * * * * * php artisan schedule:run
 ```
@@ -263,30 +296,27 @@ docker exec -it october-cms npm run build
 ## 🐛 Отладка
 
 Для просмотра логов контейнера:
+
 ```bash
 docker logs -f october-cms
 ```
 
 Для входа в контейнер:
+
 ```bash
 docker exec -it october-cms bash
 ```
 
 Логи October CMS находятся в:
+
 ```bash
 /var/www/html/storage/logs/
 ```
 
-## 🔄 Обновление October CMS
-
-```bash
-docker exec -it october-cms bash
-cd /var/www/html
-composer update
-php artisan october:up
-```
-
 ## 📝 Примечания
+
+Образ создан исключительно для поддержки старых проектов на October CMS 1.1.12. Для других версий рекомендуется использовать
+официальные образы или создавать собственные на их основе.
 
 - При первом запуске с MySQL/PostgreSQL убедитесь, что база данных создана
 - SQLite используется по умолчанию для быстрого старта
@@ -302,8 +332,4 @@ October CMS распространяется под [MIT License](https://github
 - [Официальная документация October CMS](https://octobercms.com/docs)
 - [GitHub репозиторий October CMS](https://github.com/octobercms/october)
 - [Документация Docker](https://docs.docker.com/)
-
-## 👥 Поддержка
-
-Для сообщения об ошибках или предложений создайте issue в репозитории проекта.
 
